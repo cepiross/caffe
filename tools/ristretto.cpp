@@ -38,6 +38,8 @@ DEFINE_int32(iterations, 50,
     "Optional: The number of iterations to run.");
 DEFINE_double(error_margin, 2,
     "Optional: the allowed accuracy drop in %");
+DEFINE_int32(score_index, 0,
+    "Optional: the score index among net outputs");
 
 // A simple registry for caffe commands.
 typedef int (*BrewFunction)();
@@ -82,10 +84,12 @@ int quantize(){
   CHECK_GT(FLAGS_model_quantized.size(), 0) << "Need network description "
       "output path.";
   CHECK_GT(FLAGS_trimming_mode.size(), 0) << "Need trimming mode.";
+  CHECK_GT(FLAGS_score_index, -1) << "Invalid score index.";
+
   Quantization* q = new Quantization(FLAGS_model, FLAGS_weights,
       FLAGS_model_quantized, FLAGS_iterations, FLAGS_trimming_mode,
       FLAGS_error_margin, FLAGS_gpu);
-  q->QuantizeNet();
+  q->QuantizeNet(FLAGS_score_index);
   delete q;
   return 0;
 }

@@ -28,7 +28,7 @@ Quantization::Quantization(string model, string weights, string model_quantized,
   this->exp_bits_ = 4;
 }
 
-void Quantization::QuantizeNet() {
+void Quantization::QuantizeNet(const int score_number) {
   CheckWritePermissions(model_quantized_);
   SetGpu();
   // Run the reference floating point network on validation set to find baseline
@@ -36,22 +36,22 @@ void Quantization::QuantizeNet() {
   Net<float>* net_val = new Net<float>(model_, caffe::TEST);
   net_val->CopyTrainedLayersFrom(weights_);
   float accuracy;
-  RunForwardBatches(this->iterations_, net_val, &accuracy);
+  RunForwardBatches(this->iterations_, net_val, &accuracy, false, score_number);
   test_score_baseline_ = accuracy;
   delete net_val;
   // Run the reference floating point network on train data set to find maximum
   // values. Do statistic for 10 batches.
   Net<float>* net_test = new Net<float>(model_, caffe::TRAIN);
   net_test->CopyTrainedLayersFrom(weights_);
-  RunForwardBatches(10, net_test, &accuracy, true);
+  RunForwardBatches(10, net_test, &accuracy, true, score_number);
   delete net_test;
   // Do network quantization and scoring.
   if (trimming_mode_ == "dynamic_fixed_point") {
-    Quantize2DynamicFixedPoint();
+    Quantize2DynamicFixedPoint(score_number);
   } else if (trimming_mode_ == "minifloat") {
-    Quantize2MiniFloat();
+    Quantize2MiniFloat(score_number);
   } else if (trimming_mode_ == "integer_power_of_2_weights") {
-    Quantize2IntegerPowerOf2Weights();
+    Quantize2IntegerPowerOf2Weights(score_number);
   } else {
     LOG(FATAL) << "Unknown trimming mode: " << trimming_mode_;
   }
@@ -155,7 +155,7 @@ void Quantization::RunForwardBatches(const int iterations,
   *accuracy = test_score[score_number] / iterations;
 }
 
-void Quantization::Quantize2DynamicFixedPoint() {
+void Quantization::Quantize2DynamicFixedPoint(const int score_number) {
   // Find the integer length for dynamic fixed point numbers.
   // The integer length is chosen such that no saturation occurs.
   // This approximation assumes an infinitely long factional part.
@@ -187,7 +187,7 @@ void Quantization::Quantize2DynamicFixedPoint() {
         bitwidth, -1, -1, -1);
     net_test = new Net<float>(param);
     net_test->CopyTrainedLayersFrom(weights_);
-    RunForwardBatches(iterations_, net_test, &accuracy);
+    RunForwardBatches(iterations_, net_test, &accuracy, false, score_number);
     test_bw_conv_params.push_back(bitwidth);
     test_scores_conv_params.push_back(accuracy);
     delete net_test;
@@ -205,7 +205,7 @@ void Quantization::Quantize2DynamicFixedPoint() {
         -1, bitwidth, -1, -1);
     net_test = new Net<float>(param);
     net_test->CopyTrainedLayersFrom(weights_);
-    RunForwardBatches(iterations_, net_test, &accuracy);
+    RunForwardBatches(iterations_, net_test, &accuracy, false, score_number);
     test_bw_fc_params.push_back(bitwidth);
     test_scores_fc_params.push_back(accuracy);
     delete net_test;
@@ -223,7 +223,7 @@ void Quantization::Quantize2DynamicFixedPoint() {
         "Activations", -1, -1, bitwidth, bitwidth);
     net_test = new Net<float>(param);
     net_test->CopyTrainedLayersFrom(weights_);
-    RunForwardBatches(iterations_, net_test, &accuracy);
+    RunForwardBatches(iterations_, net_test, &accuracy, false, score_number);
     test_bw_layer_activations.push_back(bitwidth);
     test_scores_layer_activations.push_back(accuracy);
     delete net_test;
@@ -267,7 +267,7 @@ void Quantization::Quantize2DynamicFixedPoint() {
       bw_out_);
   net_test = new Net<float>(param);
   net_test->CopyTrainedLayersFrom(weights_);
-  RunForwardBatches(iterations_, net_test, &accuracy);
+  RunForwardBatches(iterations_, net_test, &accuracy, false, score_number);
   delete net_test;
   param.release_state();
   WriteProtoToTextFile(param, model_quantized_);
@@ -303,7 +303,7 @@ void Quantization::Quantize2DynamicFixedPoint() {
   LOG(INFO) << "Please fine-tune.";
 }
 
-void Quantization::Quantize2MiniFloat() {
+void Quantization::Quantize2MiniFloat(const int score_number) {
   // Find the necessary amount of exponent bits.
   // The exponent bits are chosen such that no saturation occurs.
   // This approximation assumes an infinitely long mantissa.
@@ -328,7 +328,7 @@ void Quantization::Quantize2MiniFloat() {
     EditNetDescriptionMiniFloat(&param, bitwidth);
     net_test = new Net<float>(param);
     net_test->CopyTrainedLayersFrom(weights_);
-    RunForwardBatches(iterations_, net_test, &accuracy);
+    RunForwardBatches(iterations_, net_test, &accuracy, false, score_number);
     test_bitwidth.push_back(bitwidth);
     test_scores.push_back(accuracy);
     delete net_test;
@@ -362,7 +362,7 @@ void Quantization::Quantize2MiniFloat() {
   LOG(INFO) << "Please fine-tune.";
 }
 
-void Quantization::Quantize2IntegerPowerOf2Weights() {
+void Quantization::Quantize2IntegerPowerOf2Weights(const int score_number) {
   // Find the integer length for dynamic fixed point numbers.
   // The integer length is chosen such that no saturation occurs.
   // This approximation assumes an infinitely long factional part.
@@ -384,7 +384,7 @@ void Quantization::Quantize2IntegerPowerOf2Weights() {
       "Activations", -1, -1, 8, 8);
   net_test = new Net<float>(param);
   net_test->CopyTrainedLayersFrom(weights_);
-  RunForwardBatches(iterations_, net_test, &accuracy);
+  RunForwardBatches(iterations_, net_test, &accuracy, false, score_number);
   delete net_test;
 
   // Write prototxt file of quantized net

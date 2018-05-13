@@ -17,7 +17,7 @@ class Quantization {
 public:
   explicit Quantization(string model, string weights, string model_quantized,
       int iterations, string trimming_mode, double error_margin, string gpus);
-  void QuantizeNet();
+  void QuantizeNet(const int score_number = 0);
 private:
   void CheckWritePermissions(const string path);
   void SetGpu();
@@ -41,14 +41,14 @@ private:
    * Find the required number of bits required for parameters and layer
    * activations (which might differ from each other).
    */
-  void Quantize2DynamicFixedPoint();
+  void Quantize2DynamicFixedPoint(const int score_number = 0);
   /**
    * @brief Quantize convolutional and fully connected layers to minifloat.
    * Parameters and layer activations share the same numerical representation.
    * This simulates hardware arithmetic which uses IEEE-754 standard (with some
    * small optimizations).
    */
-  void Quantize2MiniFloat();
+  void Quantize2MiniFloat(const int score_number = 0);
   /**
    * @brief Quantize convolutional and fully connected parameters to
    * integer-power-of-two numbers.
@@ -61,7 +61,7 @@ private:
    * exponent.
    * The quantized layers don't need any multipliers in hardware.
    */
-  void Quantize2IntegerPowerOf2Weights();
+  void Quantize2IntegerPowerOf2Weights(const int score_number = 0);
   /**
    * @brief Change network to dynamic fixed point.
    */
